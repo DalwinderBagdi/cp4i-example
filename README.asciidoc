@@ -1,0 +1,18 @@
+= Resources for the GOX Project
+
+== Sample OpenShift Container Platform (OCP) Application
+
+This repository contains a sample application deployment for OpenShift Container Platform (OCP). The deployment demonstrates a simple web application built using Flask, a micro web framework for Python. The setup includes containerizing the application, creating a Deployment that manages a ReplicaSet, configuring a Service to expose the application internally, setting up a Route to access the application externally, and utilizing ConfigMaps and Secrets to manage environment variables and sensitive data.
+
+To deploy the application, execute the following command:
+
+[source,bash]
+----
+./deploy.sh
+----
+
+Before running the deployment script, ensure that you have Podman installed and have logged in to your OpenShift cluster using the appropriate credentials.
+
+This sample application serves as a starting point for understanding how to deploy containerized applications on OpenShift Container Platform.
+
+
