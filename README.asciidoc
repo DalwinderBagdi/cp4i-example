@@ -8,7 +8,7 @@ To deploy the application, execute the following command:
 
 [source,bash]
 ----
-cd ace
+cd ocp-example
 ./deploy.sh
 ----
 
@@ -64,3 +64,4 @@ When configuring the LoopBackRequest node, you'll see a properties section with 
 * *ace-rest-to-mongo-read.zip*: This ZIP file contains the App Connect flow that integrates with MongoDB. It includes the necessary configuration for the LoopBackRequest node and other components.
 
 
+=== API Connect
