@@ -8,11 +8,59 @@ To deploy the application, execute the following command:
 
 [source,bash]
 ----
+cd ace
 ./deploy.sh
 ----
 
 Before running the deployment script, ensure that you have Podman installed and have logged in to your OpenShift cluster using the appropriate credentials.
 
 This sample application serves as a starting point for understanding how to deploy containerized applications on OpenShift Container Platform.
+
+== Reading customers example
+
+
+=== MongoDb
+
+MongoDB will be used as a data store within ACE flows for managing customer information. The Docker image provided here facilitates easy deployment and configuration of MongoDB instances, enabling seamless integration with ACE applications.
+
+This repository contains files to build a Docker image for MongoDB, tailored specifically for use in ACE (App Connect Enterprise) flows.
+
+The Docker image includes a custom initialization script (init-mongo.js) that creates a database named sample, creates a user with appropriate permissions, and inserts sample customer data into the customerDetails collection.
+
+
+To deploy the application, execute the following command:
+
+[source,bash]
+----
+cd mongo
+./deploy.sh
+----
+
+=== App Connect
+
+==== Reading customers
+
+This repository contains an ACE (App Connect Enterprise) BAR file along with a datasource.json file that configures the MongoDB datasource. The ACE application is designed to handle GET requests on /customers/{customer_number} endpoint, querying a MongoDB database for customer details identified by a customer_number. The retrieved data is then processed and returned as a response.
+
+image::images/the-flow.png[]
+
+==== Loop Back
+
+By incorporating a LoopBackRequest node into our App Connect flow, we simplify the process of retrieving customer data from MongoDB. This node serves as a seamless connector, facilitating effective communication between our ACE application and the MongoDB database.
+
+However, there are scenarios where a DatabaseRequest node might be more suitable. For instance, if our data is structured and stored in a relational database, or if we need to execute SQL queries for precise data retrieval and manipulation, a DatabaseRequest node would be preferable over LoopBackRequest.
+
+image::images/loopback-request-node-properties.png[]
+
+When configuring the LoopBackRequest node, you'll see a properties section with two key settings:
+
+* Data source name: This setting corresponds to a name defined in the datasource.json file. It specifies the data source the node will connect to, facilitating smooth communication with the database.
+* Loopback object: This setting denotes the "table" name in MongoDB. It specifies the collection or object within MongoDB that the node will query or interact with.
+
+===== Contents
+
+* *readCustomerDetailsV1.bar*: The ace-mongo-integration.bar file contains the compiled ACE application.
+* *datasource.json*: This file configures the MongoDB datasource for the ACE application. It contains connection details such as host, port, database name, username, and password.
+* *ace-rest-to-mongo-read.zip*: This ZIP file contains the App Connect flow that integrates with MongoDB. It includes the necessary configuration for the LoopBackRequest node and other components.
 
 
