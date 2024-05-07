@@ -1,0 +1,14 @@
+metadata:
+  namespace: ace
+  name: get-customers-manual
+spec:
+  barURL:
+    - >-
+      https://db-01-quickstart-dash.ace:3443/v1/directories/getCustomer?f1dfc593-2ddc-4355-8294-02b0473b53ae
+  configurations:
+    - mongo-datasource-ace-config.json.zip
+  license:
+    accept: true
+    license: L-QECF-MBXVLU
+    use: CloudPakForIntegrationNonProduction
+  version: 12.0.12.0-r1

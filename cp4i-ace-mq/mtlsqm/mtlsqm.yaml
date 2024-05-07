@@ -1,0 +1,60 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: mtlsmqsc
+  namespace: mq
+data:
+  example.mqsc: |-
+    DEFINE QLOCAL('IN')
+    DEFINE QLOCAL('OUT')
+    DEFINE CHANNEL(ACE_SVRCONN) CHLTYPE(SVRCONN) TRPTYPE(TCP) SSLCAUTH(REQUIRED) SSLCIPH('ANY_TLS12_OR_HIGHER')
+    ALTER AUTHINFO(SYSTEM.DEFAULT.AUTHINFO.IDPWOS) AUTHTYPE(IDPWOS) ADOPTCTX(YES) CHCKCLNT(OPTIONAL) CHCKLOCL(OPTIONAL) AUTHENMD(OS)
+    SET CHLAUTH('ACE_SVRCONN') TYPE(SSLPEERMAP) SSLPEER('CN=application1,OU=app team1') USERSRC(MAP) MCAUSER('app1') ACTION(ADD)
+    REFRESH SECURITY TYPE(CONNAUTH)
+    SET AUTHREC PRINCIPAL('app1') OBJTYPE(QMGR) AUTHADD(CONNECT,INQ)
+    SET AUTHREC PROFILE('IN') PRINCIPAL('app1') OBJTYPE(QUEUE) AUTHADD(BROWSE,GET,INQ,PUT,PASSALL)
+    SET AUTHREC PROFILE('OUT') PRINCIPAL('app1') OBJTYPE(QUEUE) AUTHADD(BROWSE,GET,INQ,PUT,PASSALL)
+  example.ini: |-
+    Service:
+      Name=AuthorizationService
+      EntryPoints=14
+      SecurityPolicy=UserExternal
+---
+apiVersion: mq.ibm.com/v1beta1
+kind: QueueManager
+metadata:
+  name: mtlsqm
+  namespace: mq
+spec:
+  version: 9.3.5.1-r1
+  license:
+    accept: true
+    license: L-VTPK-22YZPK
+    use: NonProduction
+  pki:
+    keys:
+    - name: default
+      secret:
+        secretName: qmcerts
+        items:
+          - tls.key
+          - tls.crt
+    trust:
+    - name: app
+      secret:
+        secretName: mqtrustcerts
+        items:
+          - application.crt
+  web:
+    enabled: true
+  queueManager:
+    ini:
+      - configMap:
+          name: mtlsmqsc
+          items:
+            - example.ini
+    mqsc:
+      - configMap:
+          name: mtlsmqsc
+          items:
+            - example.mqsc

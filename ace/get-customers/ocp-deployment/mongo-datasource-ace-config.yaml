@@ -1,0 +1,9 @@
+apiVersion: appconnect.ibm.com/v1beta1
+kind: Configuration
+metadata:
+  name: mongo-datasource-ace-config.json.zip
+  namespace: ace
+spec:
+  secretName: mongo-datasource-ace-config-secret
+  type: loopbackdatasource
+  version: 12.0.12.0-r1

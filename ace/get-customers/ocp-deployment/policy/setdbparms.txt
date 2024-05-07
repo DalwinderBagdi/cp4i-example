@@ -1,0 +1,1 @@
+mqsisetdbparms -w /home/aceuser/ace-server -n mq::customer-details -u app -p passw0rd

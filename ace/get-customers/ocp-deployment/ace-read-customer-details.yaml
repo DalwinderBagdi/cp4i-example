@@ -1,0 +1,22 @@
+apiVersion: appconnect.ibm.com/v1beta1
+kind: IntegrationRuntime
+metadata:
+  name: get-customer-details
+  namespace: ace
+spec:
+  configurations:
+    - mongo-datasource-ace-config.json.zip
+  license:
+    accept: true
+    license: L-QECF-MBXVLU
+    use: CloudPakForIntegrationNonProduction
+  template:
+    spec:
+      containers:
+        - resources:
+          name: runtime
+          image: image-registry.openshift-image-registry.svc:5000/ace/ace-read-customer-details:2.0
+  replicas: 1
+  version: '12.0.12.0-r1'
+  flowType:
+    toolkitFlow: true

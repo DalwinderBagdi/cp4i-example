@@ -1,0 +1,19 @@
+oc new-project datapower-external
+
+oc get secret apic-ingress-ca -n apic -o yaml > ingress-ca.yaml
+oc apply -f ingress-ca.yaml
+
+oc apply -f common-issuer-and-gateway-certs.yaml
+
+oc get issuers
+NAME                 READY
+ingress-issuer       True
+selfsigning-issuer   True
+
+oc create secret generic gw-admin-secret --from-literal=password=admin
+
+Check storage class and hosts in apigatway_cr.yaml
+
+oc apply -f apigateway_cr.yaml
+
+curl -k https://rgwd.apps.66311da33313fb001ef59e09.cloud.techzone.ibm.com.com/health

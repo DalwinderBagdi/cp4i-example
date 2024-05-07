@@ -1,0 +1,545 @@
+-- Validate DNS --
+------------------
+
+dig api.ocpinstall.gym.lan -x 192.168.252.3 +short
+192.168.252.3
+api.ocpinstall.gym.lan.
+
+dig test.apps.ocpinstall.gym.lan +short
+192.168.252.4
+
+dig bootstrap.ocpinstall.gym.lan +short
+192.168.252.49
+
+dig master-0.ocpinstall.gym.lan +short
+192.168.252.50
+
+dig master-1.ocpinstall.gym.lan +short
+192.168.252.51
+
+dig master-2.ocpinstall.gym.lan +short
+192.168.252.52
+
+dig worker-0.ocpinstall.gym.lan +short
+192.168.252.53
+
+dig worker-1.ocpinstall.gym.lan +short
+192.168.252.54
+
+dig worker-2.ocpinstall.gym.lan +short
+192.168.252.55
+
+
+
+Validate DNS lookup
+dig +noall +answer @192.168.252.50 master-0.ocpinstall.gym.lan
+master-0.ocpinstall.gym.lan. 5	IN	A	192.168.252.50
+
+Validate reverse DNS lookups
+dig +noall +answer @master-0.ocpinstall.gym.lan -x 192.168.252.50
+50.252.168.192.in-addr.arpa. 30	IN	PTR	ocpinstall-8rf7b-master-0.
+50.252.168.192.in-addr.arpa. 30	IN	PTR	ocpinstall-8rf7b-master-0.ocpinstall.gym.lan.
+
+-- Install OCP --
+-----------------
+
+OI_VERSION=stable-4.14
+curl -Lo openshift-install-linux.tar.gz https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OI_VERSION}/openshift-install-linux.tar.gz
+tar xf openshift-install-linux.tar.gz openshift-install
+sudo install openshift-install /usr/local/bin
+openshift-install version
+rm openshift-install-linux.tar.gz openshift-install
+OC_VERSION=stable-4.14
+curl -Lo openshift-client-linux.tar.gz https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux.tar.gz
+tar xf openshift-client-linux.tar.gz oc
+sudo install oc /usr/local/bin
+oc version
+rm openshift-client-linux.tar.gz oc
+VCENTER_HOSTNAME=
+curl -kL https://${VCENTER_HOSTNAME}/certs/download.zip -o download.zip
+unzip download.zip
+sudo cp certs/lin/* /etc/pki/ca-trust/source/anchors
+sudo update-ca-trust extract
+rm -fr download.zip certs/
+mkdir ocp4
+ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_core
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_core
+openshift-install create install-config --dir=ocp4
+vim ocp4/install-config.yaml
+
+https://docs.openshift.com/container-platform/4.14/installing/installing_vsphere/installation-config-parameters-vsphere.html#installation-config-parameters-vsphere
+
+cp ocp4/install-config.yaml ./install-config.yaml
+openshift-install create cluster --dir ./ocp4 --log-level=info
+
+    pfsense workaround:
+        ssh core@192.168.252.49 -i ~/.ssh/id_core
+        sudo hostnamectl set-hostname bootstrap
+
+
+
+-- pfsense --
+-------------
+
+https://192.168.252.1/services_dnsmasq.php
+Services / DNS / Forwarder
+
+	General DNS Forwarder Options
+		Custom options
+			address=/apps.ocpinstall.gym.lan/192.168.252.4
+
+
+
+	Host Overrides
+
+Host		Domain				IP
+
+api			ocpinstall.gym.lan	192.168.252.3
+bootstrap	ocpinstall.gym.lan	192.168.252.49
+master-0	ocpinstall.gym.lan	192.168.252.50
+master-1	ocpinstall.gym.lan	192.168.252.51
+master-2	ocpinstall.gym.lan	192.168.252.52
+worker-0	ocpinstall.gym.lan	192.168.252.53
+worker-1	ocpinstall.gym.lan	192.168.252.54
+worker-2	ocpinstall.gym.lan	192.168.252.55
+
+
+MAYBE BETTER:
+
+https://192.168.252.1/services_unbound.php
+Services / DNS / Resolver
+
+    General DNS Resolver Options
+        Custom options
+            server:
+            local-zone: "apps.ocpinstall.gym.lan" redirect
+            local-data: "apps.ocpinstall.gym.lan 300 IN A 192.168.252.4"
+
+    Host Overrides
+
+Host		Domain				IP
+
+
+api	        ocpinstall.gym.lan	192.168.252.3
+bootstrap	ocpinstall.gym.lan	192.168.252.49
+master-0	ocpinstall.gym.lan	192.168.252.50
+master-1	ocpinstall.gym.lan	192.168.252.51
+master-2	ocpinstall.gym.lan	192.168.252.52
+worker-0	ocpinstall.gym.lan	192.168.252.53
+worker-1	ocpinstall.gym.lan	192.168.252.54
+worker-2	ocpinstall.gym.lan	192.168.252.55
+
+
+
+
+[2.6.0-RELEASE][admin@pfsense.gym.lan]/root: cat /var/unbound/host_entries.conf
+local-zone: "gym.lan." transparent
+local-data-ptr: "127.0.0.1 localhost.gym.lan"
+local-data: "localhost. A 127.0.0.1"
+local-data: "localhost.gym.lan. A 127.0.0.1"
+local-data-ptr: "::1 localhost.gym.lan"
+local-data: "localhost. AAAA ::1"
+local-data: "localhost.gym.lan. AAAA ::1"
+local-data-ptr: "192.168.252.1 pfsense.gym.lan"
+local-data: "pfsense.gym.lan. A 192.168.252.1"
+local-data-ptr: "192.168.252.3 api.ocpinstall.gym.lan"
+local-data: "api.ocpinstall.gym.lan. A 192.168.252.3"
+local-data-ptr: "192.168.252.49 bootstrap.ocpinstall.gym.lan"
+local-data: "bootstrap.ocpinstall.gym.lan. A 192.168.252.49"
+local-data-ptr: "192.168.252.50 master-0.ocpinstall.gym.lan"
+local-data: "master-0.ocpinstall.gym.lan. A 192.168.252.50"
+local-data-ptr: "192.168.252.51 master-1.ocpinstall.gym.lan"
+local-data: "master-1.ocpinstall.gym.lan. A 192.168.252.51"
+local-data-ptr: "192.168.252.52 master-2.ocpinstall.gym.lan"
+local-data: "master-2.ocpinstall.gym.lan. A 192.168.252.52"
+local-data-ptr: "192.168.252.53 worker-0.ocpinstall.gym.lan"
+local-data: "worker-0.ocpinstall.gym.lan. A 192.168.252.53"
+local-data-ptr: "192.168.252.54 worker-1.ocpinstall.gym.lan"
+local-data: "worker-1.ocpinstall.gym.lan. A 192.168.252.54"
+local-data-ptr: "192.168.252.55 worker-2.ocpinstall.gym.lan"
+local-data: "worker-2.ocpinstall.gym.lan. A 192.168.252.55"
+
+
+
+-- install-config.yaml --
+-------------------------
+
+
+featureSet: TechPreviewNoUpgrade
+apiVersion: v1
+baseDomain: gym.lan
+additionalTrustBundlePolicy: Proxyonly
+compute:
+- architecture: amd64
+hyperthreading: Enabled
+name: worker
+replicas: 3
+platform:
+vsphere:
+cpus: 16
+coresPerSocket: 2
+#memoryMB: 49152
+#memoryMB: 40960
+memoryMB: 32768
+osDisk:
+diskSizeGB: 300
+controlPlane:
+architecture: amd64
+hyperthreading: Enabled
+name: master
+replicas: 3
+platform:
+vsphere:
+cpus: 10
+coresPerSocket: 2
+memoryMB: 16384
+osDisk:
+diskSizeGB: 120
+metadata:
+creationTimestamp: null
+name: ocpinstall
+networking:
+clusterNetwork:
+- cidr: 9.248.0.0/14
+hostPrefix: 23
+machineNetwork:
+- cidr: 192.168.252.0/24
+networkType: OVNKubernetes
+serviceNetwork:
+- 10.248.0.0/16
+platform:
+vsphere:
+hosts:
+- role: bootstrap
+networkDevice:
+ipAddrs:
+- 192.168.252.49/24
+gateway: 192.168.252.1
+nameservers:
+- 192.168.252.1
+- role: control-plane
+networkDevice:
+ipAddrs:
+- 192.168.252.50/24
+gateway: 192.168.252.1
+nameservers:
+- 192.168.252.1
+- role: control-plane
+networkDevice:
+ipAddrs:
+- 192.168.252.51/24
+gateway: 192.168.252.1
+nameservers:
+- 192.168.252.1
+- role: control-plane
+networkDevice:
+ipAddrs:
+- 192.168.252.52/24
+gateway: 192.168.252.1
+nameservers:
+- 192.168.252.1
+- role: compute
+networkDevice:
+ipAddrs:
+- 192.168.252.53/24
+gateway: 192.168.252.1
+nameservers:
+- 192.168.252.1
+- role: compute
+networkDevice:
+ipAddrs:
+- 192.168.252.54/24
+gateway: 192.168.252.1
+nameservers:
+- 192.168.252.1
+- role: compute
+networkDevice:
+ipAddrs:
+- 192.168.252.55/24
+gateway: 192.168.252.1
+nameservers:
+- 192.168.252.1
+vCenter: ocpgym-vc.techzone.ibm.local
+username: gymuser-rz8m7isw@techzone.ibm.local
+password: qitNZUqM
+datacenter: IBMCloud
+defaultDatastore: gym-55000525js-rz8m7isw-storage
+cluster: ocp-gym
+apiVIP: 192.168.252.3
+ingressVIP: 192.168.252.4
+network: 'gym-55000525js-rz8m7isw-segment'
+folder: '/IBMCloud/vm/ocp-gym/gym-55000525js-rz8m7isw'
+resourcePool: '/IBMCloud/host/ocp-gym/Resources/Cluster Resource Pool/Gym Member Resource Pool/gym-55000525js-rz8m7isw'
+pullSecret: '{"auths":{"cloud.openshift.com":{"auth":"b3BlbnNoaWZ0LXJlbGVhc2UtZGV2K2plcmVteWJldWNsZXJpYm0xZG93N2E2ZWV3M3J3M2c4aWNnN3Vmbjl3cXQ6NFVETkdDMVczN0pVVlM2MEM2UUpTNDE5MlpGVk5HWVdSWExZVUhQSlNURlVNS0lEODBEQVFINExBQkRRTzE3Ng==","email":"jeremy.beucler@ibm.com"},"quay.io":{"auth":"b3BlbnNoaWZ0LXJlbGVhc2UtZGV2K2plcmVteWJldWNsZXJpYm0xZG93N2E2ZWV3M3J3M2c4aWNnN3Vmbjl3cXQ6NFVETkdDMVczN0pVVlM2MEM2UUpTNDE5MlpGVk5HWVdSWExZVUhQSlNURlVNS0lEODBEQVFINExBQkRRTzE3Ng==","email":"jeremy.beucler@ibm.com"},"registry.connect.redhat.com":{"auth":"NTMzMTg4MDh8dWhjLTFkb1c3QTZFRXczcnczZzhJY0c3dWZOOVdxdDpleUpoYkdjaU9pSlNVelV4TWlKOS5leUp6ZFdJaU9pSTJPVFZsTURneE1tWTVPVFUwTURRNVlUVXpZakEzWVdJek1EYzBZVEZpWmlKOS5GWEZEbDdwb2FBNzVYeG9NU1ktdTdGWUxFZEVMcGhoZjd6azJGbmhPeHpJRndhcEFGRHRoMVpHSnFmNlZfM1lSWHFUUzlLMHpDclFzR0NwVjA5dmV2eWVrV1FSTTZRRzNsRjF0RDRVUGRIM1p6SGtwdzJzT3F3SmNUZHoyYS1JT3VEclVKX1U5OGZTUEE4M2xxWmJFeC0xLXdNR2Fhb2p0NDhkSmFvdzFzamNMZktmYVdDRUdEZVo1amtoMUlYWjNtM0VPNkJLRzdxaG8yX1g2M09nQXpvUHBtUHpHTVZoaEhGamxoSEZlSUMzMzJQbEpSOW5PelJRXzlhQnJ2UTR0Q0RIMGpscUw3OUdfWWNoeWFYN3ZxWTQ1aFJJci1GM0VONi1xbkZyOThOOEJWRE1aOWJ4bUFrVHJoWmN3bzNqTUNPTzU5T1NDN2hRaXFwUDdveDREN2hLRUdPNlJNcjJnVmo4RnRwaW1BRXgtQnFVLWF0djdHak01N3NJQktOZ0c5eUF2cFZsN0l3UzZnd1NmV1JOX25DZ1pVRUphOEdvMWFBeEd6b0JCdlA4cmFLTkJSQ2h5TXJQcWJTWGoxaldkMS1GaXNyc2JQTW5GRkQzZnJPY0ppc1Fmb09kaGpQZV9heDJqU0VtdWVTZTJ4U2ltdUVjMjZ2SzVkWURlOGd1eUlib05haFYtUGJsVjBUTnUxTnNyYlRBYnhPUzlCUHdLVVpKdENGbllWOEZqR3VZLWFYWGhrS2lzS1BMeUxhalZwVkFFU19ncTFTTmZORTZ5ZTZfLVF6d1B3aG1iOTl0bTNOV0ZlNUd4cWJlaWItZmgzUDJET1prUWJManpUUnB6QmNzVXNObVgyM0xZUWdWaHdhVlBlSG9TaWFCcnVzMXRLV2xMeHQydHJnaw==","email":"jeremy.beucler@ibm.com"},"registry.redhat.io":{"auth":"NTMzMTg4MDh8dWhjLTFkb1c3QTZFRXczcnczZzhJY0c3dWZOOVdxdDpleUpoYkdjaU9pSlNVelV4TWlKOS5leUp6ZFdJaU9pSTJPVFZsTURneE1tWTVPVFUwTURRNVlUVXpZakEzWVdJek1EYzBZVEZpWmlKOS5GWEZEbDdwb2FBNzVYeG9NU1ktdTdGWUxFZEVMcGhoZjd6azJGbmhPeHpJRndhcEFGRHRoMVpHSnFmNlZfM1lSWHFUUzlLMHpDclFzR0NwVjA5dmV2eWVrV1FSTTZRRzNsRjF0RDRVUGRIM1p6SGtwdzJzT3F3SmNUZHoyYS1JT3VEclVKX1U5OGZTUEE4M2xxWmJFeC0xLXdNR2Fhb2p0NDhkSmFvdzFzamNMZktmYVdDRUdEZVo1amtoMUlYWjNtM0VPNkJLRzdxaG8yX1g2M09nQXpvUHBtUHpHTVZoaEhGamxoSEZlSUMzMzJQbEpSOW5PelJRXzlhQnJ2UTR0Q0RIMGpscUw3OUdfWWNoeWFYN3ZxWTQ1aFJJci1GM0VONi1xbkZyOThOOEJWRE1aOWJ4bUFrVHJoWmN3bzNqTUNPTzU5T1NDN2hRaXFwUDdveDREN2hLRUdPNlJNcjJnVmo4RnRwaW1BRXgtQnFVLWF0djdHak01N3NJQktOZ0c5eUF2cFZsN0l3UzZnd1NmV1JOX25DZ1pVRUphOEdvMWFBeEd6b0JCdlA4cmFLTkJSQ2h5TXJQcWJTWGoxaldkMS1GaXNyc2JQTW5GRkQzZnJPY0ppc1Fmb09kaGpQZV9heDJqU0VtdWVTZTJ4U2ltdUVjMjZ2SzVkWURlOGd1eUlib05haFYtUGJsVjBUTnUxTnNyYlRBYnhPUzlCUHdLVVpKdENGbllWOEZqR3VZLWFYWGhrS2lzS1BMeUxhalZwVkFFU19ncTFTTmZORTZ5ZTZfLVF6d1B3aG1iOTl0bTNOV0ZlNUd4cWJlaWItZmgzUDJET1prUWJManpUUnB6QmNzVXNObVgyM0xZUWdWaHdhVlBlSG9TaWFCcnVzMXRLV2xMeHQydHJnaw==","email":"jeremy.beucler@ibm.com"}}}'
+sshKey: |
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIu2ukPCggRP2VZCwsZP82+SLL72us8PHLcFJkZozL19 admin@bastion
+
+
+ODF
+---
+
+ran the initial IPI deploy on the vmw cluster, minus the ODF infra nodes
+created a new machineset spec by adapting a copy of the worker node spec
+applied the new infra machineset spec to create three more nodes
+shut down each of those nodes, added extra disk devices to each, then restarted them
+then deployed the local storage operator in prep for ODF consumption of the new disk devices
+
+
+storageclass.kubernetes.io/is-default-class true
+
+
+-- Install CP4I --
+------------------
+https://www.ibm.com/docs/en/cloud-paks/cp-integration/2023.4
+
+
+oc new-project cp4i
+oc new-project ace
+oc new-project mq
+oc new-project apic
+oc new-project ibm-common-services
+
+oc create secret docker-registry ibm-entitlement-key --docker-username=cp --docker-password=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJJQk0gTWFya2V0cGxhY2UiLCJpYXQiOjE2NjY4NjQxMDIsImp0aSI6IjZhOTZhZTFjOTA1MTQ1NjA4ZTU1ZWI2Y2NhYjRkY2QxIn0.8_pQ6MfNvd6mBWUQ6xMzP1g3QBYAZPlbs_lgO74kFcw --docker-server=cp.icr.io --namespace=cp4i
+
+oc create secret docker-registry ibm-entitlement-key --docker-username=cp --docker-password=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJJQk0gTWFya2V0cGxhY2UiLCJpYXQiOjE2NjY4NjQxMDIsImp0aSI6IjZhOTZhZTFjOTA1MTQ1NjA4ZTU1ZWI2Y2NhYjRkY2QxIn0.8_pQ6MfNvd6mBWUQ6xMzP1g3QBYAZPlbs_lgO74kFcw --docker-server=cp.icr.io --namespace=ace
+
+oc create secret docker-registry ibm-entitlement-key --docker-username=cp --docker-password=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJJQk0gTWFya2V0cGxhY2UiLCJpYXQiOjE2NjY4NjQxMDIsImp0aSI6IjZhOTZhZTFjOTA1MTQ1NjA4ZTU1ZWI2Y2NhYjRkY2QxIn0.8_pQ6MfNvd6mBWUQ6xMzP1g3QBYAZPlbs_lgO74kFcw --docker-server=cp.icr.io --namespace=mq
+
+oc create secret docker-registry ibm-entitlement-key --docker-username=cp --docker-password=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJJQk0gTWFya2V0cGxhY2UiLCJpYXQiOjE2NjY4NjQxMDIsImp0aSI6IjZhOTZhZTFjOTA1MTQ1NjA4ZTU1ZWI2Y2NhYjRkY2QxIn0.8_pQ6MfNvd6mBWUQ6xMzP1g3QBYAZPlbs_lgO74kFcw --docker-server=cp.icr.io --namespace=apic
+
+oc create secret docker-registry ibm-entitlement-key --docker-username=cp --docker-password=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJJQk0gTWFya2V0cGxhY2UiLCJpYXQiOjE2NjY4NjQxMDIsImp0aSI6IjZhOTZhZTFjOTA1MTQ1NjA4ZTU1ZWI2Y2NhYjRkY2QxIn0.8_pQ6MfNvd6mBWUQ6xMzP1g3QBYAZPlbs_lgO74kFcw --docker-server=cp.icr.io --namespace=ibm-common-services
+
+oc create secret docker-registry ibm-entitlement-key --docker-username=cp --docker-password=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJJQk0gTWFya2V0cGxhY2UiLCJpYXQiOjE2NjY4NjQxMDIsImp0aSI6IjZhOTZhZTFjOTA1MTQ1NjA4ZTU1ZWI2Y2NhYjRkY2QxIn0.8_pQ6MfNvd6mBWUQ6xMzP1g3QBYAZPlbs_lgO74kFcw --docker-server=cp.icr.io --namespace=openshift-operators
+
+// RH cert manager from UI
+cert-manager Operator for Red Hat OpenShift
+
+
+// Cloud Pak Commands
+export OPERATOR_PACKAGE_NAME=ibm-integration-platform-navigator && export OPERATOR_VERSION=7.2.4 && export ARCH=amd64
+export OPERATOR_PACKAGE_NAME=ibm-apiconnect && export OPERATOR_VERSION=5.1.0
+export OPERATOR_PACKAGE_NAME=ibm-appconnect && export OPERATOR_VERSION=11.5.0
+export OPERATOR_PACKAGE_NAME=ibm-mq && export OPERATOR_VERSION=3.1.2
+export OPERATOR_PACKAGE_NAME=ibm-cp-common-services && export OPERATOR_VERSION=4.6.0
+
+oc ibm-pak get ${OPERATOR_PACKAGE_NAME} --version ${OPERATOR_VERSION}
+oc ibm-pak generate mirror-manifests ${OPERATOR_PACKAGE_NAME} icr.io --version ${OPERATOR_VERSION}
+cat ~/.ibm-pak/data/mirror/${OPERATOR_PACKAGE_NAME}/${OPERATOR_VERSION}/catalog-sources.yaml
+oc apply -f ~/.ibm-pak/data/mirror/${OPERATOR_PACKAGE_NAME}/${OPERATOR_VERSION}/catalog-sources.yaml
+
+// OR directly for this version
+cat << EOF | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+name: ibm-integration-platform-navigator-catalog
+namespace: openshift-marketplace
+spec:
+displayName: ibm-integration-platform-navigator-7.2.4
+publisher: IBM
+image: icr.io/cpopen/ibm-integration-platform-navigator-catalog@sha256:71d5b07bb009e9b111a5755c191a6dd3d5a80c24f371f93d25d30a22d6339a35
+sourceType: grpc
+updateStrategy:
+registryPoll:
+interval: 30m0s
+EOF
+
+
+cat << EOF | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+name: ibm-apiconnect-catalog
+namespace: openshift-marketplace
+spec:
+displayName: ibm-apiconnect-5.1.0
+publisher: IBM
+image: icr.io/cpopen/ibm-apiconnect-catalog@sha256:2058d863696e3adccd620ab3210a84f792c2953e42a9b61f350b4ad897723f1e
+sourceType: grpc
+updateStrategy:
+registryPoll:
+interval: 30m0s
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+name: ibm-datapower-operator-catalog
+namespace: openshift-marketplace
+spec:
+displayName: ibm-datapower-operator-1.9.1
+publisher: IBM
+image: icr.io/cpopen/datapower-operator-catalog@sha256:ca27fcd0c507db3c0370a903caef76b1f0114e57db7eac09f2132b20fb732db2
+sourceType: grpc
+updateStrategy:
+registryPoll:
+interval: 30m0s
+EOF
+
+
+cat << EOF | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+name: appconnect-operator-catalogsource
+namespace: openshift-marketplace
+spec:
+displayName: ibm-appconnect-11.5.0
+publisher: IBM
+image: icr.io/cpopen/appconnect-operator-catalog@sha256:f386adc2e8757eae4fe9e0d04761a8b557fdda0aa7300440a464dc012dc3cf28
+sourceType: grpc
+updateStrategy:
+registryPoll:
+interval: 30m0s
+EOF
+
+
+cat << EOF | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+name: ibmmq-operator-catalogsource
+namespace: openshift-marketplace
+spec:
+displayName: ibm-mq-3.1.2
+publisher: IBM
+image: icr.io/cpopen/ibm-mq-operator-catalog@sha256:9c9211c1b42caba5ac2dff299945b22649ce600f3f0994077af6d440e4594046
+sourceType: grpc
+updateStrategy:
+registryPoll:
+interval: 30m0s
+EOF
+
+// Not needed?!
+(cloud-native-postgresql-catalog) --> doesn't work
+integration-ibm-cloud-native-postgresql
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+name: integration-ibm-cloud-native-postgresql
+namespace: openshift-marketplace
+spec:
+displayName: ibm-cloud-native-postgresql-4.22.0+20240307.065137.1505
+publisher: IBM
+image: icr.io/cpopen/ibm-cpd-cloud-native-postgresql-operator-catalog@sha256:3a44f3e7f01e4eb72d192008f1502777dc10751b68e40da2e1d38d23f2907ce7
+sourceType: grpc
+updateStrategy:
+registryPoll:
+interval: 30m0s
+---
+
+
+cat << EOF | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+name: ibm-cs-iam-catalog
+namespace: openshift-marketplace
+spec:
+displayName: ibm-cs-iam-4.5.0
+publisher: IBM
+image: icr.io/cpopen/ibm-iam-operator-catalog@sha256:dd64034fb63a04cb380e81b25d54708bb96080a1b6417d9d068b6f4a1904bebc
+sourceType: grpc
+updateStrategy:
+registryPoll:
+interval: 30m0s
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+name: ibm-cs-install-catalog
+namespace: openshift-marketplace
+spec:
+displayName: ibm-cs-install-4.6.0
+publisher: IBM
+image: icr.io/cpopen/ibm-cs-install-catalog@sha256:1eb2d3fe9fdbcf1c413de123cd62344e72b4034054b02f08e351839d3f1dda9c
+sourceType: grpc
+updateStrategy:
+registryPoll:
+interval: 30m0s
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+name: ibm-events-operator-catalog
+namespace: openshift-marketplace
+spec:
+displayName: ibm-events-operator-5.0.0
+publisher: IBM
+image: icr.io/cpopen/ibm-events-operator-catalog@sha256:2267b5677e10a25aa6522d2d60ef85e8be5d65bb32b8c4b82afcf854440e6d34
+sourceType: grpc
+updateStrategy:
+registryPoll:
+interval: 30m0s
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+name: ibm-zen-operator-catalog
+namespace: openshift-marketplace
+spec:
+displayName: ibm-zen-3.1.3
+publisher: IBM
+image: icr.io/cpopen/ibm-zen-operator-catalog@sha256:320db8cf76a866450e1afb76066545aa04675b7f91246587d76eaf17bd92b5e0
+sourceType: grpc
+updateStrategy:
+registryPoll:
+interval: 30m0s
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+name: opencloud-operators
+namespace: openshift-marketplace
+spec:
+displayName: ibm-cp-common-services-4.6.0
+publisher: IBM
+image: icr.io/cpopen/ibm-common-service-catalog@sha256:491916cce0da256b7b15d7cb1dc7fdd30465a366a5d8796d0dee898c99cde1a3
+sourceType: grpc
+updateStrategy:
+registryPoll:
+interval: 30m0s
+EOF
+
+
+oc get catalogsource -A //-n openshift-marketplace
+
+-- INSTALL CP4I OPERATORS FROM UI --
+
+oc patch CatalogSource integration-ibm-cloud-native-postgresql -n openshift-operators --type merge --patch '{"spec":{"grpcPodConfig":{"securityContextConfig":"restricted"}}}'
+
+-- INSTALL PN FROM UI --
+
+oc extract secret/integration-admin-initial-temporary-credentials -n ibm-common-services --to -
+
+
+
+-- Install APIC --
+------------------
+
+apiVersion: apiconnect.ibm.com/v1beta1
+kind: APIConnectCluster
+metadata:
+labels:
+app.kubernetes.io/instance: apiconnect
+app.kubernetes.io/managed-by: ibm-apiconnect
+app.kubernetes.io/name: apiconnect-small
+name: apic
+namespace: apic
+annotations:
+apiconnect-operator/backups-not-configured: "true"
+spec:
+analytics:
+mtlsValidateClient: true
+license:
+accept: true
+license: L-MMBZ-295QZQ
+metric: VIRTUAL_PROCESSOR_CORE
+use: production
+portal:
+mtlsValidateClient: true
+profile: n1xc7.m48
+version: 10.0.7.0
+storageClassName: thin-csi
+
+
