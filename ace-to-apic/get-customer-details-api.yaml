@@ -1,0 +1,13 @@
+apiVersion: apiconnect.ibm.com/v1beta1
+kind: API
+metadata:
+  name: get-customer-details
+  namespace: ace
+spec:
+  definition:
+    integrationRuntime:
+      name: get-customer-details
+  share:
+    apim:
+      credentialsSecret: apim-credentials
+      providerOrg: gxo
