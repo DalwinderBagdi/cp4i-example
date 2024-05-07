@@ -1,0 +1,26 @@
+apiVersion: appconnect.ibm.com/v1beta1
+kind: IntegrationRuntime
+metadata:
+  name: mqtest
+  namespace: ace
+spec:
+  configurations:
+    - application.kdb
+    - application.sth
+    - mqtest-policyproject
+    - mqtest-server.conf.yaml
+    - mqtest-ir-adminssl
+  license:
+    accept: true
+    license: L-QECF-MBXVLU
+    use: CloudPakForIntegrationNonProduction
+  template:
+    spec:
+      containers:
+        - resources:
+          name: runtime
+          image: image-registry.openshift-image-registry.svc:5000/ace/ace-mq-test:1.0
+  replicas: 1
+  version: '12.0.12.0-r1'
+  flowType:
+    toolkitFlow: true
